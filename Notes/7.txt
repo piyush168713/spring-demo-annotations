@@ -1,0 +1,194 @@
+Lecture- 82
+
+Special Note about Destroy Lifecycle and Prototype Scope
+
+
+Here is a subtle point you need to be aware of with "prototype" scoped beans.
+
+For "prototype" scoped beans, Spring does not call the @PreDestroy method.  Gasp!
+
+I didn't know this either until I dug through the Spring reference manual researching a student's question.
+
+Here is the answer from the Spring reference manual. Section 1.5.2
+
+https://docs.spring.io/spring/docs/current/spring-framework-reference/core.html#beans-factory-scopes-prototype
+
+---
+
+In contrast to the other scopes, Spring does not manage the complete lifecycle of a
+prototype bean: the container instantiates, configures, and otherwise assembles a
+prototype object, and hands it to the client, with no further record of that prototype
+instance.
+
+Thus, although initialization lifecycle callback methods are called on all objects regardless of scope,
+in the case of prototypes, configured destruction lifecycle callbacks are not called. The client code must
+clean up prototype-scoped objects and release expensive resources that the prototype bean(s) are holding.
+
+To get the Spring container to release resources held by prototype-scoped beans, try using a custom bean
+post-processor, which holds a reference to beans that need to be cleaned up.
+
+This also applies to XML configuration.
+
+---
+
+QUESTION: How can I create code to call the destroy method on prototype scope beans
+
+
+
+ANSWER:
+
+You can destroy prototype beans but custom coding is required. This examples shows how to destroy prototype scoped beans.
+
+1. Create a custom bean processor. This bean processor will keep track of prototype scoped beans. During shutdown
+it will call the destroy() method on the prototype scoped beans.
+
+
+
+package com.luv2code.springdemo;
+
+import java.util.LinkedList;
+import java.util.List;
+
+import org.springframework.beans.BeansException;
+import org.springframework.beans.factory.BeanFactory;
+import org.springframework.beans.factory.BeanFactoryAware;
+import org.springframework.beans.factory.DisposableBean;
+import org.springframework.beans.factory.config.BeanPostProcessor;
+import org.springframework.stereotype.Component;
+
+@Component
+public class MyCustomBeanProcessor implements BeanPostProcessor, BeanFactoryAware, DisposableBean {
+
+	private BeanFactory beanFactory;
+
+	private final List<Object> prototypeBeans = new LinkedList<>();
+
+	@Override
+	public Object postProcessAfterInitialization(Object bean, String beanName) throws BeansException {
+
+		// after start up, keep track of the prototype scoped beans.
+		// we will need to know who they are for later destruction
+
+		if (beanFactory.isPrototype(beanName)) {
+			synchronized (prototypeBeans) {
+				prototypeBeans.add(bean);
+			}
+		}
+
+		return bean;
+	}
+
+
+	@Override
+	public void setBeanFactory(BeanFactory beanFactory) throws BeansException {
+		this.beanFactory = beanFactory;
+	}
+
+
+	@Override
+	public void destroy() throws Exception {
+
+		// loop through the prototype beans and call the destroy() method on each one
+
+        synchronized (prototypeBeans) {
+
+        	for (Object bean : prototypeBeans) {
+
+        		if (bean instanceof DisposableBean) {
+                    DisposableBean disposable = (DisposableBean)bean;
+                    try {
+                        disposable.destroy();
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+
+        	prototypeBeans.clear();
+        }
+
+	}
+}
+
+
+
+
+2. The prototype scoped beans MUST implement the DisposableBean interface. This interface defines a
+"destroy()" method. This method should be used instead of the @PreDestroy annotation.
+
+
+
+package com.luv2code.springdemo;
+
+import javax.annotation.PostConstruct;
+
+import org.springframework.beans.factory.DisposableBean;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Scope;
+import org.springframework.stereotype.Component;
+
+@Component
+@Scope("prototype")
+public class TennisCoach implements Coach, DisposableBean {
+
+	@Autowired
+	private FortuneService fortuneService;
+
+	@PostConstruct
+	public void doMyStartupStuff() {
+		System.out.println(">> TennisCoach: inside doMyStartupStuff()");
+	}
+
+	@Override
+	public String getDailyWorkout() {
+		return "Practice your backhand volley";
+	}
+
+	@Override
+	public String getDailyFortune() {
+		return fortuneService.getFortune();
+	}
+
+	@Override
+	public void destroy() throws Exception {
+		System.out.println(">> TennisCoach: inside destroy()");
+
+	}
+
+}
+
+
+3. In this app, BeanProcessorDemoApp.java is the main program. TennisCoach.java is the prototype
+scoped bean. TennisCoach implements the DisposableBean interface and provides the destroy() method.
+The custom bean processing is handled in the MyCustomBeanProcessor class.
+
+
+
+package com.luv2code.springdemo;
+
+import org.springframework.context.support.ClassPathXmlApplicationContext;
+
+public class BeanProcessorDemoApp {
+
+	public static void main(String[] args) {
+
+		// load spring config file
+		ClassPathXmlApplicationContext context = new
+				ClassPathXmlApplicationContext("applicationContext.xml");
+
+		// retrieve bean from spring container
+		Coach theCoach = context.getBean("tennisCoach", Coach.class);
+
+		System.out.println("Daily workout: " + theCoach.getDailyWorkout());
+
+		// close the context
+		context.close();
+	}
+
+}
+
+
+See source code here for details: destroy-protoscope-bean-with-custom-processor.zip
+
+
+
