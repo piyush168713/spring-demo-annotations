@@ -1,0 +1,15 @@
+FAQ: How to inject properties file using Java annotations
+
+
+
+Answer:
+
+This solution will show you how inject values from a properties file using annotatons.
+The values will no longer be hard coded in the Java code.
+
+1. Create a properties file to hold your properties. It will be a name value pair.
+
+New text file:  src/sport.properties
+
+foo.email=myeasycoach@luv2code.com
+foo.team=Silly Java Coders
