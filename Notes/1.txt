@@ -1,0 +1,13 @@
+Lecture- 59
+
+AUTOWIRING
+
+FAQ: What if there are multiple FortuneService implementations?
+
+When using autowiring, what if there are multiple FortuneService implementations? Like in the image below?
+
+ANSWER
+
+Spring has special support to handle this case. Use the @Qualifier annotation.
+We'll cover this later in the course with slides and code examples. But don't worry,
+we will address all scenarios :-)
