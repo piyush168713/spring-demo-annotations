@@ -1,0 +1,34 @@
+Using @Qualifier with Constructors
+
+
+1. --> Using @Qualifiers with Constructor injection
+@Autowired
+    public TennisCoach(@Qualifier("randomFortuneService") FortuneService theFortuneService) {
+
+        System.out.println(">> TennisCoach: inside constructor using @autowired and @qualifier");
+
+        fortuneService = theFortuneService;
+    }
+
+
+
+2. -->@Qualifier with Setter Injection
+
+You can use similar syntax with Setter Injection. You can use @Qualifier in method arguments line, such as
+
+
+
+	@Autowired
+	public void setFortuneService(@Qualifier("randomFortuneService") FortuneService theFortuneService) {
+		System.out.println(">> TennisCoach: inside setFortuneService() method");
+		this.fortuneService = theFortuneService;
+	}
+
+You can also use the @Qualifier above the method name. For example, here's the syntax
+
+	@Autowired
+	@Qualifier("randomFortuneService")
+	public void setFortuneService(FortuneService theFortuneService) {
+		System.out.println(">> TennisCoach: inside setFortuneService() method");
+		this.fortuneService = theFortuneService;
+	}
