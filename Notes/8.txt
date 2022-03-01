@@ -1,0 +1,245 @@
+Lecture- 86
+
+
+Heads Up - Add Logging Messages in Spring 5.1 - All Java Config Version
+The Problem
+
+In Spring 5.1, the Spring Development team changed the logging levels
+internally. As a result, by default you will no longer see the red logging
+messages at the INFO level. This is different than in the videos.
+The Solution - Using @ComponentScan
+
+If you would like to configure your app to show similar logging messages as
+in the video, you can make the following updates. Note, you will not see the
+EXACT same messages, since the Spring team periodically changes the text of the
+internal logging messages. However, this should give you some additional logging data.
+
+Overview of the steps
+
+0. Create a logging properties file
+
+1. Create a configuration class to configure the parent logger and console handler
+
+
+
+Detailed Steps
+
+0. Create a logging properties file
+
+This properties file will define the logging levels for the application.
+The props file sets the logger level to FINE. For more detailed logging info,
+you can set the logging level to level to FINEST.  You can read more about the
+logging levels at http://www.vogella.com/tutorials/Logging/article.html
+
+File: src/mylogger.properties
+
+root.logger.level=FINE
+printed.logger.level=FINE
+
+---
+
+1. Create a configuration class to configure the parent logger and console handler
+
+This class will set the parent logger level for the application context. It will
+also set the logging level for console handler. The logging levels are loaded from
+the configuration file using the @PropertySource annotation. The fields are injected
+using the @Value annotation. This class also has a @PostConstruct method to handle the actual configuration.
+
+File: MyLoggerConfig.java
+
+package com.luv2code.springdemo;
+
+import java.util.logging.ConsoleHandler;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import java.util.logging.SimpleFormatter;
+
+import javax.annotation.PostConstruct;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.AnnotationConfigApplicationContext;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.PropertySource;
+
+@Configuration
+@PropertySource("classpath:mylogger.properties")
+public class MyLoggerConfig {
+
+	@Value("${root.logger.level}")
+	private String rootLoggerLevel;
+
+	@Value("${printed.logger.level}")
+	private String printedLoggerLevel;
+
+	@PostConstruct
+	public void initLogger() {
+
+		// parse levels
+		Level rootLevel = Level.parse(rootLoggerLevel);
+		Level printedLevel = Level.parse(printedLoggerLevel);
+
+		// get logger for app context
+		Logger applicationContextLogger = Logger.getLogger(AnnotationConfigApplicationContext.class.getName());
+
+		// get parent logger
+		Logger loggerParent = applicationContextLogger.getParent();
+
+		// set root logging level
+		loggerParent.setLevel(rootLevel);
+
+		// set up console handler
+		ConsoleHandler consoleHandler = new ConsoleHandler();
+		consoleHandler.setLevel(printedLevel);
+		consoleHandler.setFormatter(new SimpleFormatter());
+
+		// add handler to the logger
+		loggerParent.addHandler(consoleHandler);
+	}
+
+}
+---
+
+Source code is available at the following link
+
+https://gist.github.com/darbyluv2code/a49009fe1f92f95a30d2d5f7ac987ce5
+
+---
+
+Once you make these updates, then you will be able to see additional logging data. :-)
+
+
+
+
+
+=========================
+
+Alternate Solution - All Java Config (no xml)
+
+Here's an alternate solution using All Java Config (no xml). In this case, we don't use
+@Component or @ComponentScan for the Logger class.
+
+
+
+Overview of the steps
+
+0. Create a logging properties file
+
+1. Create a logger class
+
+2. Create a configuration class and use @Bean
+
+
+
+Detailed Steps
+
+0. Create a logging properties file
+
+This properties file will define the logging levels for the application. The props file sets the
+logger level to FINE. For more detailed logging info, you can set the logging level to level to FINEST.
+
+File: src/mylogger.properties
+
+root.logger.level=FINE
+printed.logger.level=FINE
+---
+
+1. Create a logger class
+
+This class will set the parent logger level for the application context. It will also set the logging
+level for console handler. The logging levels are passed in the constructor.
+
+package com.luv2code.springdemo;
+
+import java.util.logging.ConsoleHandler;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import java.util.logging.SimpleFormatter;
+
+import org.springframework.context.annotation.AnnotationConfigApplicationContext;
+
+public class MyLoggerConfig1 {
+
+	public MyLoggerConfig1(String rootLoggerLevel, String printedLoggerLevel) {
+
+		// parse levels
+		Level rootLevel = Level.parse(rootLoggerLevel);
+		Level printedLevel = Level.parse(printedLoggerLevel);
+
+		// get logger for app context
+		Logger applicationContextLogger = Logger.getLogger(AnnotationConfigApplicationContext.class.getName());
+
+		// get parent logger
+		Logger loggerParent = applicationContextLogger.getParent();
+
+		// set root logging level
+		loggerParent.setLevel(rootLevel);
+
+		// set up console handler
+		ConsoleHandler consoleHandler = new ConsoleHandler();
+		consoleHandler.setLevel(printedLevel);
+		consoleHandler.setFormatter(new SimpleFormatter());
+
+		// add handler to the logger
+		loggerParent.addHandler(consoleHandler);
+	}
+
+}
+
+
+Note: This MyLoggerConfig class is not labeled as @Component and doesn't use component scanning
+
+
+2. Create a configuration class and use @Bean
+
+We make use of the @Bean annotation to register an instance of the logger config.
+The logger fields are injected using the @Value annotation. The method constructs the logger
+config and passes in the logging levels. The logger config class handles the actual logging configuration.
+
+package com.luv2code.springdemo;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.PropertySource;
+
+@Configuration
+@PropertySource("classpath:mylogger.properties")
+public class SportConfig {
+
+	@Bean
+	public MyLoggerConfig1 myLoggerConfig(@Value("${root.logger.level}") String rootLoggerLevel,
+										 @Value("${printed.logger.level}") String printedLoggerLevel) {
+
+		MyLoggerConfig1 myLoggerConfig = new MyLoggerConfig1(rootLoggerLevel, printedLoggerLevel);
+
+		return myLoggerConfig;
+	}
+
+	// define bean for our sad fortune service
+	@Bean
+	public FortuneService sadFortuneService() {
+		return new SadFortuneService();
+	}
+
+	// define bean for our swim coach AND inject dependency
+	@Bean
+	public Coach swimCoach() {
+		SwimCoach mySwimCoach = new SwimCoach(sadFortuneService());
+
+		return mySwimCoach;
+	}
+
+}
+
+
+---
+
+Source code is available at the following link: spring-demo-all-java-no-xml.zip
+
+---
+
+
+
+Once you make these updates, then you will be able to see additional logging data. :-)
+
+
